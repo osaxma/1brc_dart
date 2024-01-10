@@ -1,6 +1,5 @@
-
 name: onebrc_dart # apparently dart complains if name starts with a number
-description: 1brc challange in dart 
+description: 1brc challange in dart
 version: 0.0.1
 repository: https://github.com/osaxma/onebrc_dart
 publish_to: none
@@ -8,9 +7,3 @@ publish_to: none
 environment:
   sdk: ^3.2.3
 
-# dependencies:
-  # path: ^1.8.0
-
-dev_dependencies:
-  lints: ^2.1.0
-  test: ^1.24.0
