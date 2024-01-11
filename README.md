@@ -1,4 +1,4 @@
-A Dart version for the 1 billion rows challange. See 1brc for more details: [1brc][]
+A Dart version for the 1 billion rows challange. See [1brc][] for more details.
 
 
 ### To create measurements files 
@@ -24,31 +24,31 @@ You cannot evaluate the actual solutions without generating the data, and here's
     _For the `isolates` solutions, you define the isolates number using `dart -Disolates=10 run ....`_
 
 ### Solutions
-- [read_byte_by_byte.dart](solutions/read_byte_by_byte.dart) -- too slow
+- [read_byte_by_byte.dart](solutions/read_byte_by_byte.dart) -> too slow
     - read file byte by byte
- - [read_lines_1.dart](solutions/read_lines_1.dart) -- ~410 seconds 
+ - [read_lines_1.dart](solutions/read_lines_1.dart) -> ~410 seconds 
     - stream file as rows 
     - store stats in `List<double>`
- - [read_lines_2.dart](solutions/read_lines_2.dart) -- ~408 seconds 
+ - [read_lines_2.dart](solutions/read_lines_2.dart) -> ~408 seconds 
     - stream file as rows 
     - store stats in `Stats` mutable object
-- [read_bytes_1.dart](solutions/read_bytes_1.dart) -- ~310 seconds
+- [read_bytes_1.dart](solutions/read_bytes_1.dart) -> ~310 seconds
     - read all bytes into memory, then loop through bytes
     - stores stats in `List<double>`
-- [read_bytes_2.dart](solutions/read_bytes_2.dart) -- ~228 seconds
+- [read_bytes_2.dart](solutions/read_bytes_2.dart) -> ~228 seconds
     - same as above but stores stats in `Float32List`
-- [read_bytes_3.dart](solutions/read_bytes_3.dart) -- ~218 seconds
+- [read_bytes_3.dart](solutions/read_bytes_3.dart) -> ~218 seconds
     - same as above but stores stats in `Stats` mutable object
-- [read_bytes_async.dart](solutions/read_bytes_async.dart) -- ~205 seconds
+- [read_bytes_async.dart](solutions/read_bytes_async.dart) -> ~205 seconds
     - split task into chunks and evaluate them asynchronously
     - each chunk reads part of the file on its own
-- [read_bytes_isolates.dart](solutions/read_bytes_async.dart) -- ~47 seconds for 10 isolates and ~41 seconds for 24 isolates
+- [read_bytes_isolates.dart](solutions/read_bytes_async.dart) -> ~47 seconds for 10 isolates & ~41 seconds for 24 isolates
     - same as above but split chunks into isolates
-- [read_bytes_isolates_mmap.dart](solutions/read_bytes_async.dart) -- ~29 seconds for 10 isolates &  ~10 seconds for 24 isolates.
-    - same as above but split chunks into isolates
+- [read_bytes_isolates_mmap.dart](solutions/read_bytes_async.dart) -> ~29 seconds for 10 isolates & ~10 seconds for 24 isolates.
+    - same as above but use `mmap` through `ffi` to the file to memory
     - by: @simolus3
 
-### Notes:
+### Notes on Isolates Approach:
 According to the [challange][1brc], we can assume that a row may have anywhere from 6 bytes to 107 bytes such that:
 
 - station name: 1 to 100 bytes
@@ -60,8 +60,7 @@ According to the [challange][1brc], we can assume that a row may have anywhere f
 
 Given that, the file size is anything between 6x10^9 (6-GB) to 107x10^9 (107-GB) but we know it's ~12GB according to the challange.
 
-With this information, if we would like to process the data in multiple chunks across multiple isolates (let's say 10 where each processes 100 million rows), then we can add an additional 107 bytes for the the first nine isolates in case a row spans between two chunks. In other words, when we reach the end of the chunk, we continue reading until first newline appears (unless the end of the chunk happen to contain a newline). On the other hand, when we evaluate the last 9 chunks, we skip the initial bytes until the first newline appear (again, unless the previous chunk ended with a newline).
-
+With this information, if we would like to process the data in chunks across multiple isolates (let's say 10 where each processes 100 million rows), then we can add an additional 107 bytes for the the first nine chunks in case a row spans to the next chunk. In other words, when we reach the end of a chunk, we continue reading bytes until we encounter a newline (unless the end of the chunk happened to contain a newline). On the other hand, when we evaluate the last 9 chunks, we read the last byte of the previous chunk to see if it's a newline. If the last chunk ended with a newline, we evaluate from the first byte, otherwise we skip the initial bytes of the chunk upto the the first newline.
 
 Results so far using the method above (see [solutions/read_bytes_isolates.dart](solutions/read_bytes_isolates.dart)):
 ```
