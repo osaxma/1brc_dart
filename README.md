@@ -42,10 +42,10 @@ You cannot evaluate the actual solutions without generating the data, and here's
 - [read_bytes_async.dart](solutions/read_bytes_async.dart) -> ~205 seconds
     - split task into chunks and evaluate them asynchronously
     - each chunk reads part of the file on its own
-- [read_bytes_isolates.dart](solutions/read_bytes_async.dart) -> ~47 seconds for 10 isolates & ~41 seconds for 24 isolates
+- [read_bytes_isolates.dart](solutions/read_bytes_isolates.dart) -> ~47 seconds for 10 isolates & ~41 seconds for 24 isolates
     - same as above but split chunks into isolates
-- [read_bytes_isolates_mmap.dart](solutions/read_bytes_async.dart) -> ~29 seconds for 10 isolates & ~10 seconds for 24 isolates.
-    - same as above but use `mmap` through `ffi` to the file to memory
+- [read_bytes_isolates_mmap.dart](solutions/read_bytes_isolates_mmap.dart) -> ~29 seconds for 10 isolates & ~10 seconds for 24 isolates.
+    - same as above but use `mmap` through `ffi` to map the file into memory
     - by: @simolus3
 
 ### Notes on Isolates Approach:
