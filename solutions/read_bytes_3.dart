@@ -4,10 +4,15 @@ import 'dart:typed_data';
 
 import 'common.dart';
 
-// took 228-seconds (3.8 minutes)
-void main() {
+// Stats stored as Stats mutable object
+
+// took 218-seconds (3.6 minutes)
+void main(List<String> args) {
+  final filePath = args.single;
+
   final sw = Stopwatch()..start();
-  final bytes = File(measurements1BPath).readAsBytesSync(); // this takes ~9 seconds on its own
+  final cities = <String, Stats>{};
+  final bytes = File(filePath).readAsBytesSync(); // this takes ~9 seconds on its own
 
   final city = BytesBuilder(copy: false);
 
@@ -22,20 +27,12 @@ void main() {
     } else if (b == 10) {
       final name = String.fromCharCodes(city.takeBytes());
       final temp = double.parse(String.fromCharCodes(Uint8List.sublistView(bytes, start, end)));
-      final data = cities.putIfAbsent(
-          name,
-          () => Float32List(4)
-            ..[2] /* min */ = 100
-            ..[0] /* sum */ = 0
-            ..[1] /* count */ = 0
-            ..[3] /* max */ = -100 //
-          );
-
-      data
-        ..[0] = min(data[0], temp)
-        ..[1] = data[0] + temp
-        ..[2] = data[2] + 1
-        ..[3] = max(data[3], temp);
+      final stats = cities.putIfAbsent(name, () => Stats(name));
+      stats
+        ..sum = stats.sum + temp
+        ..maximum = max(stats.maximum, temp)
+        ..minimum = min(stats.minimum, temp)
+        ..count = stats.count + 1;
 
       end++;
       start = end;
@@ -47,13 +44,6 @@ void main() {
 
   sw.stop();
 
-  print(cities.values.map((c) {
-    final min = c[0];
-    final average = c[1] / c[2];
-    final max = c[3];
-    return '$min/$average/$max\n';
-  }));
+  print(Stats.dataToString(cities.values));
   print('took ${sw.elapsed.toString()}');
 }
-
-final cities = <String, Float32List>{};

@@ -4,11 +4,16 @@ import 'dart:typed_data';
 
 import 'common.dart';
 
+late final String filePath;
+
+// this file was just a preparation for using isolates
+
 // took 206-seconds (~3.43-minutes)
-void main() async {
+void main(List<String> args) async {
+  filePath = args.single;
   final splitBy = 6;
   final sw = Stopwatch()..start();
-  final totalBytes = File(measurements1BPath).lengthSync();
+  final totalBytes = File(filePath).lengthSync();
   final bytesPerIsolate = totalBytes ~/ splitBy;
   final remainder = totalBytes % splitBy;
 
@@ -19,7 +24,7 @@ void main() async {
     return (start, end);
   });
 
-  final futures = <Future<Map<String, Data>>>[];
+  final futures = <Future<Map<String, Stats>>>[];
   for (var c in chunks) {
     futures.add(computeChunk(c.$1, c.$2, totalBytes - 1));
   }
@@ -33,8 +38,8 @@ void main() async {
   print('took ${sw.elapsed.toString()}');
 }
 
-Future<Map<String, Data>> computeChunk(int startByte, int endByte, int lastBytePos /* end of bytes */) async {
-  final file = File(measurements1BPath).openSync()..setPositionSync(startByte);
+Future<Map<String, Stats>> computeChunk(int startByte, int endByte, int lastBytePos /* end of bytes */) async {
+  final file = File(filePath).openSync()..setPositionSync(startByte);
 
   final endPadding = endByte != lastBytePos ? maxBytesPerRow : 0;
   final length = (endByte - startByte);
@@ -61,7 +66,7 @@ Future<Map<String, Data>> computeChunk(int startByte, int endByte, int lastByteP
     }
   }
 
-  final cities = <String, Data>{};
+  final cities = <String, Stats>{};
 
   final city = BytesBuilder(copy: false);
 
@@ -80,7 +85,7 @@ Future<Map<String, Data>> computeChunk(int startByte, int endByte, int lastByteP
       final name = String.fromCharCodes(city.takeBytes());
       final temp = double.parse(String.fromCharCodes(Uint8List.sublistView(bytes, start, end)));
 
-      final data = cities.putIfAbsent(name, () => Data(name));
+      final data = cities.putIfAbsent(name, () => Stats(name));
       data
         ..sum = data.sum + temp
         ..maximum = max(data.maximum, temp)
@@ -98,11 +103,11 @@ Future<Map<String, Data>> computeChunk(int startByte, int endByte, int lastByteP
   return cities;
 }
 
-Map<String, Data> mergeData(List<Map<String, Data>> data) {
-  final merged = <String, Data>{};
+Map<String, Stats> mergeData(List<Map<String, Stats>> data) {
+  final merged = <String, Stats>{};
   for (var d in data) {
     for (var entry in d.entries) {
-      final d = merged.putIfAbsent(entry.key, () => Data(entry.key));
+      final d = merged.putIfAbsent(entry.key, () => Stats(entry.key));
       d.merge(entry.value);
     }
   }

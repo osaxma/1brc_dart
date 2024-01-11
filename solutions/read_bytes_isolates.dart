@@ -9,23 +9,16 @@ import 'common.dart';
 //         8           00:00:54
 //        10           00:00:47
 //        20           00:00:45
-void main() async {
-  final isolates = 10;
-  final String filePath;
-  if (!File(measurements1BPath).existsSync()) {
-    print('measurements_1b.txt does not exists -- will use sample file of 1000 entries');
-    filePath = measurements1000Path;
-  } else {
-    filePath = measurements1BPath;
-  }
+void main(List<String> args) async {
+  const isolates = int.fromEnvironment('isolates', defaultValue: 10);
+
+  final filePath = args.single;
 
   final sw = Stopwatch()..start();
+
   final totalBytes = File(filePath).lengthSync();
   final bytesPerIsolate = totalBytes ~/ isolates;
   final remainder = totalBytes % isolates;
-
-  // see https://github.com/dart-lang/sdk/issues/54566
-  assert(bytesPerIsolate < 2 * 1000 * 1000);
 
   final chunks = List.generate(isolates, (i) {
     final start = i * bytesPerIsolate;
@@ -34,16 +27,15 @@ void main() async {
     return (start, end);
   });
 
-  final futures = <Future<Map<String, Data>>>[];
-  for (var c in chunks) {
-    futures.add(Isolate.run(
-      () {
-        return computeChunk(c.$1, c.$2, totalBytes - 1, filePath);
-      },
-    ));
+  // see https://github.com/dart-lang/sdk/issues/54566
+  assert(bytesPerIsolate < 2 * 1000 * 1000);
+
+  final futures = <Future<Map<String, Stats>>>[];
+  for (var chunk in chunks) {
+    futures.add(Isolate.run(() => computeChunk(chunk.$1, chunk.$2, totalBytes - 1, filePath)));
   }
 
-  final res = await Future.wait(futures).then((data) => mergeData(data));
+  final res = await Future.wait(futures).then((stats) => Stats.mergeStats(stats));
 
   final buff = StringBuffer();
   res.values.forEach((d) => buff.writeln(d.toString()));
@@ -53,9 +45,17 @@ void main() async {
   print('took ${sw.elapsed}');
 }
 
-Future<Map<String, Data>> computeChunk(int startByte, int endByte, int fileLength, String path) async {
-  final file = File(path).openSync()..setPositionSync(startByte);
+Future<Map<String, Stats>> computeChunk(int startByte, int endByte, int fileLength, String filePath) async {
+  // for last nine chunks, start from the end of the last chunk
+  // to know if it ended with a newline
+  if (startByte != 0) {
+    startByte--;
+  }
 
+  final file = File(filePath).openSync()..setPositionSync(startByte);
+
+  // for the first nine chunks, add 107 bytes
+  // in case a row spans from this chunk to the next
   final endPadding = endByte != fileLength ? maxBytesPerRow : 0;
   final length = (endByte - startByte);
 
@@ -66,24 +66,21 @@ Future<Map<String, Data>> computeChunk(int startByte, int endByte, int fileLengt
   var fromIndex = 0;
   var toIndex = length;
 
-  // effective start
   if (startByte != 0) {
+    // effective start
     fromIndex = bytes.indexOf(newLineCodeUnit) + 1;
   }
 
-  // effective end
   if (endPadding != 0) {
-    for (var i = length; i < bytes.length; i++) {
-      if (bytes[i] == newLineCodeUnit) {
-        toIndex = i + 1;
-        break;
-      }
-    }
+    // effective end
+    toIndex = bytes.indexOf(newLineCodeUnit, length);
   }
 
-  final cities = <String, Data>{};
+  // this isolate storage
+  final stations = <String, Stats>{};
 
-  final city = BytesBuilder(copy: false);
+  //
+  final station = BytesBuilder(copy: false);
 
   var start = fromIndex;
   var end = fromIndex;
@@ -92,39 +89,26 @@ Future<Map<String, Data>> computeChunk(int startByte, int endByte, int fileLengt
   for (fromIndex; fromIndex < toIndex; fromIndex++) {
     b = bytes[fromIndex];
     if (b == semiColonCodeUnit) {
-      city.add(Uint8List.sublistView(bytes, start, end));
-      end++;
-      start = end;
+      station.add(Uint8List.sublistView(bytes, start, end));
+      start = ++end;
       continue;
     } else if (b == newLineCodeUnit) {
-      final name = String.fromCharCodes(city.takeBytes());
+      final name = String.fromCharCodes(station.takeBytes());
       final temp = double.parse(String.fromCharCodes(Uint8List.sublistView(bytes, start, end)));
 
-      final data = cities.putIfAbsent(name, () => Data(name));
-      data
-        ..sum = data.sum + temp
-        ..maximum = max(data.maximum, temp)
-        ..minimum = min(data.minimum, temp)
-        ..count = data.count + 1;
+      final stats = stations.putIfAbsent(name, () => Stats(name));
+      stats
+        ..sum = stats.sum + temp
+        ..maximum = max(stats.maximum, temp)
+        ..minimum = min(stats.minimum, temp)
+        ..count = stats.count + 1;
 
-      end++;
-      start = end;
+      start = ++end;
       continue;
     } else {
-      end += 1;
+      end++;
     }
   }
 
-  return cities;
-}
-
-Map<String, Data> mergeData(List<Map<String, Data>> data) {
-  final merged = <String, Data>{};
-  for (var d in data) {
-    for (var entry in d.entries) {
-      final d = merged.putIfAbsent(entry.key, () => Data(entry.key));
-      d.merge(entry.value);
-    }
-  }
-  return merged;
+  return stations;
 }

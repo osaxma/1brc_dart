@@ -4,34 +4,45 @@ import 'dart:typed_data';
 
 import 'common.dart';
 
-// took 218-seconds (3.6 minutes)
-void main() {
-  final sw = Stopwatch()..start();
-  final cities = <String, Data>{};
-  final bytes = File(measurements1000Path).readAsBytesSync(); // this takes ~9 seconds on its own
+// Stats stored as Float32List
 
-  final city = BytesBuilder(copy: false);
+// took 228-seconds (3.8 minutes)
+void main(List<String> args) {
+  final filePath = args.single;
+  final sw = Stopwatch()..start();
+  final bytes = File(filePath).readAsBytesSync(); // this takes ~9 seconds on its own
+
+  final station = BytesBuilder(copy: false);
 
   var start = 0;
   var end = 0;
   for (var b in bytes) {
-    if (b == 59) {
-      city.add(Uint8List.sublistView(bytes, start, end));
-      end++;
-      start = end;
-      continue;
-    } else if (b == 10) {
-      final name = String.fromCharCodes(city.takeBytes());
-      final temp = double.parse(String.fromCharCodes(Uint8List.sublistView(bytes, start, end)));
-      final data = cities.putIfAbsent(name, () => Data(name));
-      data
-        ..sum = data.sum + temp
-        ..maximum = max(data.maximum, temp)
-        ..minimum = min(data.minimum, temp)
-        ..count = data.count + 1;
+    if (b == semiColonCodeUnit) {
+      station.add(Uint8List.sublistView(bytes, start, end));
 
-      end++;
-      start = end;
+      start = ++end;
+      continue;
+    } else if (b == newLineCodeUnit) {
+      final name = String.fromCharCodes(station.takeBytes());
+      final temp = double.parse(String.fromCharCodes(Uint8List.sublistView(bytes, start, end)));
+      // add empty stats if this is a new station
+      final stats = stations.putIfAbsent(
+        name,
+        () => Float32List(4)
+          ..[0] /* min */ = 100 // upper limit
+          ..[1] /* max */ = -100 // lower limit
+          ..[2] /* sum */ = 0
+          ..[3] /* count */ = 0,
+      );
+
+      // update the stats (new or existing)
+      stats
+        ..[0] = min(stats[0], temp)
+        ..[1] = max(stats[1], temp)
+        ..[2] = stats[2] + temp
+        ..[3] = stats[3] + 1;
+
+      start = ++end;
       continue;
     } else {
       end += 1;
@@ -40,6 +51,13 @@ void main() {
 
   sw.stop();
 
-  print(Data.dataToString(cities.values));
+  print(stations.values.map((c) {
+    final min = c[0];
+    final average = c[2] / c[3];
+    final max = c[1];
+    return '$min/$average/$max\n';
+  }));
   print('took ${sw.elapsed.toString()}');
 }
+
+final stations = <String, Float32List>{};

@@ -5,21 +5,17 @@ const maxBytesPerRow = 107; // see README
 const semiColonCodeUnit = 59;
 const newLineCodeUnit = 10;
 
-const measurements1BPath = 'measurements_1b.txt';
-// for quick testing
-const measurements1000Path = 'measurements_1000.txt';
-
-class Data {
+class Stats {
   final String name;
-  double sum = 0;
-  double count = 0;
   double minimum = double.infinity;
   double maximum = double.negativeInfinity;
+  double sum = 0;
+  double count = 0;
   double get average => sum / count;
 
-  Data(this.name);
+  Stats(this.name);
 
-  void merge(Data data) {
+  void merge(Stats data) {
     assert(data.name == name);
     sum = data.sum + sum;
     maximum = max(data.maximum, maximum);
@@ -32,9 +28,20 @@ class Data {
     return '$name=$minimum/$average/$maximum';
   }
 
-  static String dataToString(Iterable<Data> data) {
+  static String dataToString(Iterable<Stats> data) {
     final buff = StringBuffer();
     data.forEach((d) => buff.writeln(d.toString()));
     return buff.toString();
+  }
+
+  static Map<String, Stats> mergeStats(List<Map<String, Stats>> stationStats) {
+    final merged = <String, Stats>{};
+    for (var stationStat in stationStats) {
+      for (var stat in stationStat.entries) {
+        final d = merged.putIfAbsent(stat.key, () => Stats(stat.key));
+        d.merge(stat.value);
+      }
+    }
+    return merged;
   }
 }

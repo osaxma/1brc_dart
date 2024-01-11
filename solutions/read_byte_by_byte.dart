@@ -4,10 +4,10 @@ import 'dart:math';
 import 'common.dart';
 
 // toooooo slow i didn't bother waiting
-void main() {
+void main(List<String> args) {
   final sw = Stopwatch()..start();
-
-  final f = File(measurements1BPath).openSync();
+  final filePath = args.single;
+  final f = File(filePath).openSync();
   int byte;
   var city = <int>[];
   var temp = <int>[];

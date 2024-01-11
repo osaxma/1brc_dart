@@ -7,3 +7,6 @@ publish_to: none
 environment:
   sdk: ^3.2.3
 
+dependencies:
+  ffi: ^2.1.0
+  lints: ^3.0.0
