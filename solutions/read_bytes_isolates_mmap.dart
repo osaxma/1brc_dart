@@ -1,10 +1,10 @@
 // Credit: Simon Binder
 // url: https://gist.github.com/simolus3/0ae5a63d6bf499c53aeb7b75701d8f5e
+import 'dart:collection';
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
@@ -17,7 +17,7 @@ external Pointer<Void> mmap(Pointer<Void> addr, int length, int prot, int flags,
 external int open(Pointer<Utf8> path, int mode);
 
 void main(List<String> args) async {
-  const isolates = int.fromEnvironment('isolates', defaultValue: 10);
+  const isolates = int.fromEnvironment('isolates', defaultValue: 24);
 
   final String filePath = args.single;
 
@@ -81,7 +81,7 @@ Future<Map<String, Stats>> computeChunk(int startByte, int endByte, int fileLeng
 
   // effective start
   if (startByte != 0) {
-    fromIndex = bytes.indexOf(newLineCodeUnit) + 1;
+    fromIndex = bytes.indexOf(newLineCodeUnit, 0) + 1;
   }
 
   // effective end
@@ -89,39 +89,36 @@ Future<Map<String, Stats>> computeChunk(int startByte, int endByte, int fileLeng
     toIndex = bytes.indexOf(newLineCodeUnit, length);
   }
 
-  final cities = <String, Stats>{};
+  // this isolate storage
+  final stations = HashMap<String, Stats>();
 
-  final city = BytesBuilder(copy: false);
-
-  var start = fromIndex;
-  var end = fromIndex;
-  int b = 0;
-
+  int marker = fromIndex;
+  int stationStart = marker;
+  int stationEnd = 0;
+  int tempStart = 0;
   for (fromIndex; fromIndex < toIndex; fromIndex++) {
-    b = bytes[fromIndex];
+    final b = bytes[fromIndex];
     if (b == semiColonCodeUnit) {
-      city.add(Uint8List.sublistView(bytes, start, end));
-      end++;
-      start = end;
+      stationEnd = marker;
+      tempStart = ++marker;
       continue;
     } else if (b == newLineCodeUnit) {
-      final name = String.fromCharCodes(city.takeBytes());
-      final temp = double.parse(String.fromCharCodes(Uint8List.sublistView(bytes, start, end)));
+      final name = String.fromCharCodes(bytes, stationStart, stationEnd);
+      final temp = double.parse(String.fromCharCodes(bytes, tempStart, marker));
 
-      final data = cities.putIfAbsent(name, () => Stats(name));
-      data
-        ..sum = data.sum + temp
-        ..maximum = max(data.maximum, temp)
-        ..minimum = min(data.minimum, temp)
-        ..count = data.count + 1;
+      final stats = stations[name] ??= Stats(name);
+      stats
+        ..sum = stats.sum + temp
+        ..maximum = max(stats.maximum, temp)
+        ..minimum = min(stats.minimum, temp)
+        ..count = stats.count + 1;
 
-      end++;
-      start = end;
+      // start new row
+      stationStart = ++marker;
       continue;
     } else {
-      end += 1;
+      marker++;
     }
   }
-
-  return cities;
+  return stations;
 }

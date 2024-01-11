@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:math';
@@ -6,9 +7,9 @@ import 'dart:typed_data';
 import 'common.dart';
 
 //   # isolates       hr:min:sec
-//         8           00:00:54
-//        10           00:00:47
-//        20           00:00:45
+//         8           00:00:31
+//        10           00:00:33
+//        24           00:00:29
 void main(List<String> args) async {
   const isolates = int.fromEnvironment('isolates', defaultValue: 10);
 
@@ -68,7 +69,7 @@ Future<Map<String, Stats>> computeChunk(int startByte, int endByte, int fileLeng
 
   if (startByte != 0) {
     // effective start
-    fromIndex = bytes.indexOf(newLineCodeUnit) + 1;
+    fromIndex = bytes.indexOf(newLineCodeUnit, 0) + 1;
   }
 
   if (endPadding != 0) {
@@ -77,36 +78,34 @@ Future<Map<String, Stats>> computeChunk(int startByte, int endByte, int fileLeng
   }
 
   // this isolate storage
-  final stations = <String, Stats>{};
+  final stations = HashMap<String, Stats>();
 
-  //
-  final station = BytesBuilder(copy: false);
-
-  var start = fromIndex;
-  var end = fromIndex;
-  int b = 0;
-
+  int marker = fromIndex;
+  int stationStart = marker;
+  int stationEnd = 0;
+  int tempStart = 0;
   for (fromIndex; fromIndex < toIndex; fromIndex++) {
-    b = bytes[fromIndex];
+    final b = bytes[fromIndex];
     if (b == semiColonCodeUnit) {
-      station.add(Uint8List.sublistView(bytes, start, end));
-      start = ++end;
+      stationEnd = marker;
+      tempStart = ++marker;
       continue;
     } else if (b == newLineCodeUnit) {
-      final name = String.fromCharCodes(station.takeBytes());
-      final temp = double.parse(String.fromCharCodes(Uint8List.sublistView(bytes, start, end)));
+      final name = String.fromCharCodes(bytes, stationStart, stationEnd);
+      final temp = double.parse(String.fromCharCodes(bytes, tempStart, marker));
 
-      final stats = stations.putIfAbsent(name, () => Stats(name));
+      final stats = stations[name] ??= Stats(name);
       stats
         ..sum = stats.sum + temp
         ..maximum = max(stats.maximum, temp)
         ..minimum = min(stats.minimum, temp)
         ..count = stats.count + 1;
 
-      start = ++end;
+      // start new row
+      stationStart = ++marker;
       continue;
     } else {
-      end++;
+      marker++;
     }
   }
 
