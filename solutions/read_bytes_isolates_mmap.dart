@@ -19,7 +19,7 @@ external int open(Pointer<Utf8> path, int mode);
 void main(List<String> args) async {
   const isolates = int.fromEnvironment('isolates', defaultValue: 24);
 
-  final String filePath = args.single;
+  final filePath = args.single;
 
   final sw = Stopwatch()..start();
   final totalBytes = File(filePath).lengthSync();
@@ -42,16 +42,11 @@ void main(List<String> args) async {
   if (ptr.address == 0) {
     throw 'mmap';
   }
+  final address = ptr.address;
 
   final futures = <Future<Map<String, Stats>>>[];
   for (var c in chunks) {
-    final address = ptr.address;
-
-    futures.add(Isolate.run(
-      () {
-        return computeChunk(c.$1, c.$2, totalBytes - 1, address);
-      },
-    ));
+    futures.add(Isolate.run(() => computeChunk(c.$1, c.$2, totalBytes - 1, address)));
   }
 
   final res = await Future.wait(futures).then((stats) => Stats.mergeStats(stats));
@@ -71,21 +66,23 @@ Future<Map<String, Stats>> computeChunk(int startByte, int endByte, int fileLeng
     startByte--;
   }
 
+  // for the first nine chunks, add 107 bytes
+  // in case a row spans from this chunk to the next
   final endPadding = endByte != fileLength ? maxBytesPerRow : 0;
   final length = (endByte - startByte);
 
-  final bytes = Pointer<Uint8>.fromAddress(baseAddress).elementAt(startByte).asTypedList(length);
+  final bytes = Pointer<Uint8>.fromAddress(baseAddress).elementAt(startByte).asTypedList(length + endPadding);
 
   var fromIndex = 0;
   var toIndex = length;
 
-  // effective start
   if (startByte != 0) {
+    // effective start
     fromIndex = bytes.indexOf(newLineCodeUnit, 0) + 1;
   }
 
-  // effective end
   if (endPadding != 0) {
+    // effective end
     toIndex = bytes.indexOf(newLineCodeUnit, length);
   }
 

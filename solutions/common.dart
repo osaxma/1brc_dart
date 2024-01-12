@@ -34,12 +34,12 @@ class Stats {
     return buff.toString();
   }
 
-  static Map<String, Stats> mergeStats(List<Map<String, Stats>> stationStats) {
+  static Map<String, Stats> mergeStats(List<Map<String, Stats>> stations) {
     final merged = <String, Stats>{};
-    for (var stationStat in stationStats) {
-      for (var stat in stationStat.entries) {
-        final d = merged.putIfAbsent(stat.key, () => Stats(stat.key));
-        d.merge(stat.value);
+    for (var station in stations) {
+      for (var stat in station.entries) {
+        final mergedStat = merged.putIfAbsent(stat.key, () => Stats(stat.key));
+        mergedStat.merge(stat.value);
       }
     }
     return merged;

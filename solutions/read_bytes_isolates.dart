@@ -16,7 +16,6 @@ void main(List<String> args) async {
   final filePath = args.single;
 
   final sw = Stopwatch()..start();
-
   final totalBytes = File(filePath).lengthSync();
   final bytesPerIsolate = totalBytes ~/ isolates;
   final remainder = totalBytes % isolates;
@@ -53,8 +52,6 @@ Future<Map<String, Stats>> computeChunk(int startByte, int endByte, int fileLeng
     startByte--;
   }
 
-  final file = File(filePath).openSync()..setPositionSync(startByte);
-
   // for the first nine chunks, add 107 bytes
   // in case a row spans from this chunk to the next
   final endPadding = endByte != fileLength ? maxBytesPerRow : 0;
@@ -62,6 +59,7 @@ Future<Map<String, Stats>> computeChunk(int startByte, int endByte, int fileLeng
 
   final bytes = Uint8List(length + endPadding);
 
+  final file = File(filePath).openSync()..setPositionSync(startByte);
   file.readIntoSync(bytes);
 
   var fromIndex = 0;

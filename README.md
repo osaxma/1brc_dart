@@ -44,7 +44,7 @@ You cannot evaluate the actual solutions without generating the data, and here's
     - each chunk reads part of the file on its own
 - [read_bytes_isolates.dart](solutions/read_bytes_isolates.dart) -> ~30 seconds for 10 isolates & ~28 seconds for 24 isolates
     - same as above but split chunks into isolates
-- [read_bytes_isolates_mmap.dart](solutions/read_bytes_isolates_mmap.dart) -> ~13 seconds for 10 isolates & ~6 seconds for 24 isolates.
+- [read_bytes_isolates_mmap.dart](solutions/read_bytes_isolates_mmap.dart) -> ~30 seconds for 10 isolates & ~24 seconds for 24 isolates.
     - same as above but use `mmap` through `ffi` to map the file into memory
     - by: @simolus3
 
