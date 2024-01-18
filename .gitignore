@@ -2,5 +2,6 @@
 # Created by `dart pub`
 .dart_tool/
 /measurements_1b.txt
+/measurements_100000000.txt
 *.aot
 *.jit

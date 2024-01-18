@@ -24,30 +24,20 @@ You cannot evaluate the actual solutions without generating the data, and here's
     _For the `isolates` solutions, you define the isolates number using `dart -Disolates=10 run ....`_
 
 ### Solutions
-- [read_byte_by_byte.dart](solutions/read_byte_by_byte.dart) -> too slow
-    - read file byte by byte
- - [read_lines_1.dart](solutions/read_lines_1.dart) -> ~410 seconds 
-    - stream file as rows 
-    - store stats in `List<double>`
- - [read_lines_2.dart](solutions/read_lines_2.dart) -> ~408 seconds 
-    - stream file as rows 
-    - store stats in `Stats` mutable object
-- [read_bytes_1.dart](solutions/read_bytes_1.dart) -> ~310 seconds
-    - read all bytes into memory, then loop through bytes
-    - stores stats in `List<double>`
-- [read_bytes_2.dart](solutions/read_bytes_2.dart) -> ~228 seconds
-    - same as above but stores stats in `Float32List`
-- [read_bytes_3.dart](solutions/read_bytes_3.dart) -> ~218 seconds
-    - same as above but stores stats in `Stats` mutable object
-- [read_bytes_async.dart](solutions/read_bytes_async.dart) -> ~205 seconds
-    - split task into chunks and evaluate them asynchronously
-    - each chunk reads part of the file on its own
-- [read_bytes_isolates.dart](solutions/read_bytes_isolates.dart) -> ~30 seconds for 10 isolates & ~28 seconds for 24 isolates
-    - same as above but split chunks into isolates
-- [read_bytes_isolates_mmap.dart](solutions/read_bytes_isolates_mmap.dart) -> ~30 seconds for 10 isolates & ~24 seconds for 24 isolates.
-    - same as above but use `mmap` through `ffi` to map the file into memory
-    - by: @simolus3
 
+| solution                                                               | time                                        | Notes                                                                                      |
+|------------------------------------------------------------------------|---------------------------------------------|--------------------------------------------------------------------------------------------|
+[read_byte_by_byte.dart](solutions/read_byte_by_byte.dart)               | too slow                                    | read file byte by byte                                                                     |
+[read_lines_1.dart](solutions/read_lines_1.dart)                         | ~410s                                       | stream file as rows and store stats in `List<double>`                                      |
+[read_lines_2.dart](solutions/read_lines_2.dart)                         | ~408s                                       | stream file as rows and store stats in `Stats` mutable object                              |
+[read_bytes_1.dart](solutions/read_bytes_1.dart)                         | ~310s                                       | read all bytes into memory, then loop through them & store in `List<double>`               |
+[read_bytes_2.dart](solutions/read_bytes_2.dart)                         | ~228s                                       | same as above but stores stats in `Float32List`                                            |
+[read_bytes_3.dart](solutions/read_bytes_3.dart)                         | ~218s                                       | same as above but stores stats in `Stats` mutable object                                   |
+[read_bytes_async.dart](solutions/read_bytes_async.dart)                 | ~205s                                       | split task into chunks and evaluate them asynchronously                                    |
+[read_bytes_isolates.dart](solutions/read_bytes_isolates.dart)           | ~30s (10 isolates) <br> ~28s (16 isolates)  | same as above but split chunks into isolates                                               |
+[read_bytes_isolates_mmap.dart](solutions/read_bytes_isolates_mmap.dart) | ~30s (10 isolates) <br> ~22s (16 isolates)  | same as above but use `mmap`/`ffi` to map the file to memory (credit: @simolus3)           |
+[best.dart](solutions/best.dart)                                         | ~15s (10 isolates) <br> ~11s (16 isolates)  | every trick I could pull so far                                                            |
+[best_mmap.dart](solutions/best_mmap.dart)                               | ~8 (10 isolates) <br> ~7s (16 isolates)     | same as above + `mmap`/`ffi`                                                               |
 
 Evaluated on:
 ```
