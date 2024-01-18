@@ -25,20 +25,20 @@ You cannot evaluate the actual solutions without generating the data, and here's
 
 ### Solutions
 
-| solution                                                               | time                                        | Notes                                                                                      |
-|------------------------------------------------------------------------|---------------------------------------------|--------------------------------------------------------------------------------------------|
-[read_byte_by_byte.dart](solutions/read_byte_by_byte.dart)               | too slow                                    | read file byte by byte                                                                     |
-[read_lines_1.dart](solutions/read_lines_1.dart)                         | ~410s                                       | stream file as rows and store stats in `List<double>`                                      |
-[read_lines_2.dart](solutions/read_lines_2.dart)                         | ~408s                                       | stream file as rows and store stats in `Stats` mutable object                              |
-[read_bytes_1.dart](solutions/read_bytes_1.dart)                         | ~310s                                       | read all bytes into memory, then loop through them & store in `List<double>`               |
-[read_bytes_2.dart](solutions/read_bytes_2.dart)                         | ~228s                                       | same as above but stores stats in `Float32List`                                            |
-[read_bytes_3.dart](solutions/read_bytes_3.dart)                         | ~218s                                       | same as above but stores stats in `Stats` mutable object                                   |
-[read_bytes_async.dart](solutions/read_bytes_async.dart)                 | ~205s                                       | split task into chunks and evaluate them asynchronously                                    |
-[read_bytes_isolates.dart](solutions/read_bytes_isolates.dart)           | ~30s (10 isolates) <br> ~28s (16 isolates)  | same as above but split chunks into isolates                                               |
-[read_bytes_isolates_mmap.dart](solutions/read_bytes_isolates_mmap.dart) | ~30s (10 isolates) <br> ~22s (16 isolates)  | same as above but use `mmap`/`ffi` to map the file to memory (credit: @simolus3)           |
-[best.dart](solutions/best.dart)                                         | ~15s (10 isolates) <br> ~11s (16 isolates)  | every trick I could pull so far                                                            |
-[best_mmap.dart](solutions/best_mmap.dart)                               | ~8 (10 isolates) <br> ~7s (16 isolates)     | same as above + `mmap`/`ffi`                                                               |
-
+| solution                                                               | time                            | Notes                                                                                      |
+|------------------------------------------------------------------------|---------------------------------|--------------------------------------------------------------------------------------------|
+[read_byte_by_byte.dart](solutions/read_byte_by_byte.dart)               | too slow                        | read file byte by byte                                                                     |
+[read_lines_1.dart](solutions/read_lines_1.dart)                         | ~410s                           | stream file as rows and store stats in `List<double>`                                      |
+[read_lines_2.dart](solutions/read_lines_2.dart)                         | ~408s                           | stream file as rows and store stats in `Stats` mutable object                              |
+[read_bytes_1.dart](solutions/read_bytes_1.dart)                         | ~310s                           | read all bytes into memory, then loop through them & store in `List<double>`               |
+[read_bytes_2.dart](solutions/read_bytes_2.dart)                         | ~228s                           | same as above but stores stats in `Float32List`                                            |
+[read_bytes_3.dart](solutions/read_bytes_3.dart)                         | ~218s                           | same as above but stores stats in `Stats` mutable object                                   |
+[read_bytes_async.dart](solutions/read_bytes_async.dart)                 | ~205s                           | split task into chunks and evaluate them asynchronously                                    |
+[read_bytes_isolates.dart](solutions/read_bytes_isolates.dart)           | ~30s _(/10)_ <br> ~28s _(/16)_  | same as above but split chunks into isolates                                               |
+[read_bytes_isolates_mmap.dart](solutions/read_bytes_isolates_mmap.dart) | ~30s _(/10)_ <br> ~22s _(/16)_  | same as above but use `mmap`/`ffi` to map the file to memory (credit: @simolus3)           |
+[best.dart](solutions/best.dart)                                         | ~15s _(/10)_ <br> ~11s _(/16)_  | every trick I could pull so far                                                            |
+[best_mmap.dart](solutions/best_mmap.dart)                               | ~08s _(/10)_ <br> ~07s _(/16)_  | same as above + `mmap`/`ffi`                                                               |
+> _(/10) & (/16) refers to number of isolates_
 Evaluated on:
 ```
 Device: MacBook Pro (16-inch, 2019)
