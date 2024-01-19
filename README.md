@@ -4,14 +4,15 @@ A Dart version for the 1 billion rows challange. See [1brc][] for more details.
 - 1 billion rows of weather stations temperatures
 - Each row looks like this encoded in utf8: 
     ```
-    |   station name |   ;    | temperature  |  \n    |
+    |   station name |   ;    |  temperature |  \n    |
     |<1 to 100-bytes>|<1-byte>|<3 to 5 bytes>|<1 byte>|
     ```
 - Temperature can be anywhere from `-99.9` to `0.0` to `99.9`
 - There are 413 unique stations for the main challange file 
     - though the challange says the maximum should be 10,0000 unique stations.
-- **Requirement**: compute `min`, `average` and `max` for each station
-- print them 
+- **Requirement**: 
+    - compute `min`, `average` and `max` for each station
+    - print them 
 
 For the best result in stand alone files, see: 
 - [best.dart](/solutions/best.dart) (~10 sec)<sup>*</sup>
@@ -19,7 +20,7 @@ For the best result in stand alone files, see:
 
 ><sup>*</sup> on my machine -- see details below
 
-### To create measurements files 
+### Create Measurements Files 
 
 > _Note: `measurements_1000.txt` is a sample data with 1000 entries that is used for dev/testing only_
 
