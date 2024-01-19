@@ -5,3 +5,5 @@
 /measurements_100000000.txt
 *.aot
 *.jit
+
+.vscode/
