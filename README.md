@@ -60,6 +60,7 @@ You cannot evaluate the actual solutions without generating the data, and here's
 > _(16i) refers to number of isolates based on `Platform.numberOfProcessors` on my machine_
 >
 ><sup>1</sup> credit: [@simolus3](https://github.com/simolus3)
+
 Evaluated on:
 ```
 Device: MacBook Pro (16-inch, 2019)
