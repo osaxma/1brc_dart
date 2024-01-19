@@ -2,6 +2,8 @@
 # Created by `dart pub`
 .dart_tool/
 /measurements_1b.txt
+# 10k stations
+/measurements3.txt 
 /measurements_100000000.txt
 *.aot
 *.jit

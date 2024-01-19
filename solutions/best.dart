@@ -48,8 +48,17 @@ void main(List<String> args) async {
   sw.stop();
   print(buff.toString());
 
-  // expect 413 stations for measurements_1b.txt file
-  print('took ${sw.elapsed} for ${res.entries.length} stations');
+  final count = res.length;
+
+  // TODO: make sure this issue doesn't occur
+  // For the main challange entry, we have 413 unique stations
+  // There's a second entry that's for 10k unique stations.
+  if (count != 413 && count != 10 * 1000) {
+    // it did happen few times
+    print('Bad result, we had a hash collision');
+  }
+
+  print('took ${sw.elapsed} for $count stations');
 }
 
 Map<int, StationStats> computeChunk(int startByte, int endByte, int fileLength, String filePath) {
@@ -81,7 +90,6 @@ Map<int, StationStats> computeChunk(int startByte, int endByte, int fileLength, 
     // effective end
     toIndex = bytes.indexOf(newLineCodeUnit, length);
   }
-
   // This isolate storage
   final stations = HashMap<int, StationStats>();
 
@@ -101,15 +109,16 @@ Map<int, StationStats> computeChunk(int startByte, int endByte, int fileLength, 
   // - Add the stats to the stations' hash map or update existing one.
   // - Repeat.
   while (fromIndex < toIndex) {
-    int stationHash = 17;
+    int stationHash = Hash.hashSeed;
     int semicolonIndex = fromIndex;
     // collect the station name index and hash from beginning to semicolon
     for (;;) {
       final b = bytes[semicolonIndex];
-      stationHash = stationHash * 23 + b;
+      stationHash = Hash.combine(stationHash, b);
       if (b == semiColonCodeUnit) break;
       semicolonIndex++;
     }
+    stationHash = Hash.finish(stationHash);
 
     // once we reach a semicolon, we mark the start of the temperature
     int marker = semicolonIndex + 1;
@@ -195,6 +204,23 @@ const minusCodeUnit = 45;
 const dotCodeUnit = 46;
 const zeroCodeUnit = 48;
 const semiColonCodeUnit = 59;
+
+// from SystemHash (not public) at: lib/internal/internal.dart
+
+class Hash {
+  static int hashSeed = identityHashCode(Object);
+  static int combine(int hash, int value) {
+    hash = 0x1fffffff & (hash + value);
+    hash = 0x1fffffff & (hash + ((0x0007ffff & hash) << 10));
+    return hash ^ (hash >> 6);
+  }
+
+  static int finish(int hash) {
+    hash = 0x1fffffff & (hash + ((0x03ffffff & hash) << 3));
+    hash = hash ^ (hash >> 11);
+    return 0x1fffffff & (hash + ((0x00003fff & hash) << 15));
+  }
+}
 
 /* -------------------------------------------------------------------------- */
 /*                                    MODEL                                   */
