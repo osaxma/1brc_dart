@@ -37,7 +37,7 @@ You cannot evaluate the actual solutions without generating the data, and here's
 [read_bytes_isolates.dart](solutions/read_bytes_isolates.dart)           | ~30s _(/10)_ <br> ~28s _(/16)_  | same as above but split chunks into isolates                                               |
 [read_bytes_isolates_mmap.dart](solutions/read_bytes_isolates_mmap.dart) | ~30s _(/10)_ <br> ~22s _(/16)_  | same as above but use `mmap`/`ffi` to map the file to memory (credit: @simolus3)           |
 [best.dart](solutions/best.dart)                                         | ~15s _(/10)_ <br> ~11s _(/16)_  | every trick I could pull so far                                                            |
-[best_mmap.dart](solutions/best_mmap.dart)                               | ~08s _(/10)_ <br> ~07s _(/16)_  | same as above + `mmap`/`ffi`                                                               |
+[best_mmap.dart](solutions/best_mmap.dart)                               | ~08s _(/10)_ <br> ~06s _(/16)_  | same as above + `mmap`/`ffi`                                                               |
 > _(/10) & (/16) refers to number of isolates_
 Evaluated on:
 ```

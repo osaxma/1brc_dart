@@ -1,12 +1,12 @@
 // Credit: Simon Binder
 // url: https://gist.github.com/simolus3/0ae5a63d6bf499c53aeb7b75701d8f5e
 
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
@@ -87,61 +87,62 @@ Map<int, StationStats> computeChunk(int startByte, int endByte, int fileLength, 
   }
 
   // this isolate storage
-  final stations = <int, StationStats>{};
+  final stations = HashMap<int, StationStats>();
 
   int marker = fromIndex;
   // A lot of improvements happened here by reducing implicit loops used
-  double temp = 0.0;
   while (fromIndex < toIndex) {
-    int stationHash = Hash.seed;
+    int stationHash = 17;
     int semicolonIndex = fromIndex + 1;
+    // collect the station hash from beginning to semicolon
     for (;;) {
-      if (bytes[semicolonIndex] == semiColonCodeUnit) {
-        // we done with hashing the station name
-        stationHash = Hash.finish(stationHash);
-        // once we reach a semicolon, the digits can be at least 3 bytes or maximum 5 bytes
-        // so the newline can be anywhere from 4 to 6 bytes after the semicolon
-        marker = semicolonIndex + 1;
-
-        // we know that the temp can be between 3 to 5 digits with one decimal point (even for 0.0)
-        // such that:
-        //      name             ;         temp      newline
-        // |<1 to 100-bytes>|<1-byte>|<3 to 5 bytes>|<1 byte>
-        // Given that, we can efficiently parse the temp for this special case than using
-        // double.parse which is more generic.
-        temp = 0.0;
-
-        // check for minus sign
-        double sign;
-        if (bytes[marker] != minusCodeUnit) {
-          sign = 1.0;
-        } else {
-          sign = -1.0;
-          marker++;
-        }
-        // now we only have anything between 1 and 4 bytes left where 1 byte is the dot
-        // case 1 -> X.X & case 2 -> XX.X
-        // We need to convert the digits to integer
-        // Simply, this is the same as: '12.3'.replaceAll('.','').reduce((a,b) => (a * 10 ) + b)
-        // which gives: 123 as an integer (we divide later)
-        // but without unncessary conversions.
-        if (bytes[marker + 1] == dotCodeUnit) {
-          temp = ((bytes[marker] - zeroCodeUnit) * 10.0) + (bytes[marker + 2] - zeroCodeUnit);
-          marker = marker + 3; // i.e. newline mark
-        } else {
-          temp = ((bytes[marker] - zeroCodeUnit) * 10.0) + (bytes[marker + 1] - zeroCodeUnit);
-          temp = (temp * 10.0) + (bytes[marker + 3] - zeroCodeUnit);
-          marker = marker + 4; // i.e. newline mark
-        }
-        temp *= sign;
-
-        break;
-      }
-      stationHash = Hash.combine(stationHash, bytes[semicolonIndex]);
+      final b = bytes[semicolonIndex];
+      stationHash = stationHash * 23 + b;
+      if (b == semiColonCodeUnit) break;
       semicolonIndex++;
     }
 
-    final stats = stations[stationHash];
+    // once we reach a semicolon, the digits can be at least 3 bytes or maximum 5 bytes
+    // so the newline can be anywhere from 4 to 6 bytes after the semicolon
+    marker = semicolonIndex + 1;
+
+    // we know that the temp can be between 3 to 5 digits with one decimal point (even for 0.0)
+    // such that:
+    //      name             ;         temp      newline
+    // |<1 to 100-bytes>|<1-byte>|<3 to 5 bytes>|<1 byte>
+    // Given that, we can efficiently parse the temp for this special case than using
+    // double.parse which is more generic.
+    int temp = 0;
+
+    // check for minus sign
+    int sign;
+    if (bytes[marker] != minusCodeUnit) {
+      sign = 1;
+    } else {
+      sign = -1;
+      marker++;
+    }
+    // now we only have anything between 1 and 4 bytes left where 1 byte is the dot
+    // case 1 -> X.X & case 2 -> XX.X
+    // We need to convert the digits to integer
+    // Simply, this is the same as: '12.3'.replaceAll('.','').reduce((a,b) => (a * 10 ) + b)
+    // which gives: 123 as an integer (we divide later)
+    // but without unncessary conversions.
+    if (bytes[marker + 1] == dotCodeUnit) {
+      temp = ((bytes[marker] - zeroCodeUnit) * 10) + (bytes[marker + 2] - zeroCodeUnit);
+      marker = marker + 3; // i.e. newline mark
+    } else {
+      final d0 = bytes[marker]; // first digit
+      marker += 1;
+      final d1 = bytes[marker]; // digit before dot
+      marker += 2;
+      final d2 = bytes[marker]; // digit after dot
+      temp = (100 * d0) + (10 * d1) + d2 - (111 * zeroCodeUnit); // two steps combined in one
+      marker++;
+    }
+    temp *= sign;
+
+    final stats = stations[stationHash]; // 22% of total time is spent here
 
     if (stats != null) {
       stats
@@ -151,7 +152,7 @@ Map<int, StationStats> computeChunk(int startByte, int endByte, int fileLength, 
         ..count = stats.count + 1;
     } else {
       stations[stationHash] = StationStats(
-        utf8.decode(Uint8List.sublistView(bytes, fromIndex, semicolonIndex)),
+        utf8.decode(bytes.sublist(fromIndex, semicolonIndex)),
         stationHash,
         maximum: temp,
         minimum: temp,
@@ -181,28 +182,6 @@ const zeroCodeUnit = 48;
 const semiColonCodeUnit = 59;
 
 /* -------------------------------------------------------------------------- */
-/*                                   Hashing                                  */
-/* -------------------------------------------------------------------------- */
-
-// same hashing used by Object.hashAll but extracted here so we don't loop twice over the bytes
-// from SystemHash (not public) at dart-sdk/lib/internal/internal.dart
-class Hash {
-  static int seed = identityHashCode(Object);
-
-  static int combine(int hash, int value) {
-    hash = 0x1fffffff & (hash + value);
-    hash = 0x1fffffff & (hash + ((0x0007ffff & hash) << 10));
-    return hash ^ (hash >> 6);
-  }
-
-  static int finish(int hash) {
-    hash = 0x1fffffff & (hash + ((0x03ffffff & hash) << 3));
-    hash = hash ^ (hash >> 11);
-    return 0x1fffffff & (hash + ((0x00003fff & hash) << 15));
-  }
-}
-
-/* -------------------------------------------------------------------------- */
 /*                                    MODEL                                   */
 /* -------------------------------------------------------------------------- */
 
@@ -214,22 +193,22 @@ class StationStats {
   StationStats(
     this.name,
     this.hash, {
-    this.maximum = 1000,
-    this.minimum = -1000,
+    this.minimum = 1000,
+    this.maximum = -1000,
     this.sum = 0,
     this.count = 0,
   });
 
-  double minimum;
-  double maximum;
-  double sum;
-  double count;
+  int minimum;
+  int maximum;
+  int sum;
+  int count;
 
   static Map<int, StationStats> mergeStats(List<Map<int, StationStats>> stations) {
     final merged = <int, StationStats>{};
     for (var station in stations) {
       for (var stat in station.entries) {
-        final mergedStat = merged.putIfAbsent(stat.key, () => stat.value);
+        final mergedStat = merged.putIfAbsent(stat.key, () => StationStats(stat.value.name, stat.value.hash));
         mergedStat
           ..maximum = max(mergedStat.maximum, stat.value.maximum)
           ..minimum = min(mergedStat.minimum, stat.value.minimum)
