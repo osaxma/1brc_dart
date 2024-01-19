@@ -1,25 +1,25 @@
-// Credit: Simon Binder
-// url: https://gist.github.com/simolus3/0ae5a63d6bf499c53aeb7b75701d8f5e
-
-import 'dart:collection';
-import 'dart:convert';
-import 'dart:ffi';
+// Credit: Simon Binder - https://gist.github.com/simolus3/0ae5a63d6bf499c53aeb7b75701d8f5e
 import 'dart:io';
-import 'dart:isolate';
+import 'dart:ffi';
 import 'dart:math';
+import 'dart:isolate';
+import 'dart:convert';
+import 'dart:collection';
 
 import 'package:ffi/ffi.dart';
 
 @Native<Pointer<Void> Function(Pointer<Void>, Size, Int, Int, Int, Size)>()
-external Pointer<Void> mmap(Pointer<Void> addr, int length, int prot, int flags, int fd, int offset);
+external Pointer<Void> mmap(
+    Pointer<Void> addr, int length, int prot, int flags, int fd, int offset);
 
 @Native<Int Function(Pointer<Utf8>, Int)>()
 external int open(Pointer<Utf8> path, int mode);
 
 void main(List<String> args) async {
-  const isolates = int.fromEnvironment('isolates', defaultValue: 24);
+  const isolatesFromEnv = int.fromEnvironment('isolates', defaultValue: -1);
+  final isolates = isolatesFromEnv != -1 ? isolatesFromEnv : Platform.numberOfProcessors;
 
-  final filePath = args.single;
+  final filePath = args.firstOrNull ?? 'measurements_1b.txt';
 
   final sw = Stopwatch()..start();
   final totalBytes = File(filePath).lengthSync();
@@ -71,7 +71,9 @@ Map<int, StationStats> computeChunk(int startByte, int endByte, int fileLength, 
   final endPadding = endByte != fileLength ? maxBytesPerRow : 0;
   final length = (endByte - startByte);
 
-  final bytes = Pointer<Uint8>.fromAddress(baseAddress).elementAt(startByte).asTypedList(length + endPadding);
+  final bytes = Pointer<Uint8>.fromAddress(baseAddress) //
+      .elementAt(startByte)
+      .asTypedList(length + endPadding);
 
   var fromIndex = 0;
   var toIndex = length;
@@ -85,16 +87,28 @@ Map<int, StationStats> computeChunk(int startByte, int endByte, int fileLength, 
     // effective end
     toIndex = bytes.indexOf(newLineCodeUnit, length);
   }
-
-  // this isolate storage
+  // This isolate storage
   final stations = HashMap<int, StationStats>();
 
-  int marker = fromIndex;
-  // A lot of improvements happened here by reducing implicit loops used
+  // Main loop
+  //
+  // Since we are looping through the bytes anyway, we collect all possible information at once.
+  // Doing so, we avoid additional loops such that of `bytes.indexOf` inside the loop.
+  // This approach helped reducing the time significantly.
+  //
+  // In this loop, we are processing the following row format for reference:
+  //      name             ;         temp      newline
+  // |<1 to 100-bytes>|<1-byte>|<3 to 5 bytes>|<1 byte>
+  //
+  // The loop does the following for each row:
+  // - Collect station name's hash and start/end indices.
+  // - Parse its temperature
+  // - Add the stats to the stations' hash map or update existing one.
+  // - Repeat.
   while (fromIndex < toIndex) {
     int stationHash = 17;
-    int semicolonIndex = fromIndex + 1;
-    // collect the station hash from beginning to semicolon
+    int semicolonIndex = fromIndex;
+    // collect the station name index and hash from beginning to semicolon
     for (;;) {
       final b = bytes[semicolonIndex];
       stationHash = stationHash * 23 + b;
@@ -102,19 +116,16 @@ Map<int, StationStats> computeChunk(int startByte, int endByte, int fileLength, 
       semicolonIndex++;
     }
 
-    // once we reach a semicolon, the digits can be at least 3 bytes or maximum 5 bytes
-    // so the newline can be anywhere from 4 to 6 bytes after the semicolon
-    marker = semicolonIndex + 1;
+    // once we reach a semicolon, we mark the start of the temperature
+    int marker = semicolonIndex + 1;
 
-    // we know that the temp can be between 3 to 5 digits with one decimal point (even for 0.0)
-    // such that:
-    //      name             ;         temp      newline
-    // |<1 to 100-bytes>|<1-byte>|<3 to 5 bytes>|<1 byte>
-    // Given that, we can efficiently parse the temp for this special case than using
-    // double.parse which is more generic.
+    // We know that the temp can be between at least 3-digits/bytes and at most 5-digits/bytes.
+    // Also we know that each temperature has one decimal point (including 0.0)
+    //
+    // Given that, we can efficiently parse the temp for this special case than using `double.parse`
     int temp = 0;
 
-    // check for minus sign
+    // First, check for minus sign
     int sign;
     if (bytes[marker] != minusCodeUnit) {
       sign = 1;
@@ -122,27 +133,39 @@ Map<int, StationStats> computeChunk(int startByte, int endByte, int fileLength, 
       sign = -1;
       marker++;
     }
-    // now we only have anything between 1 and 4 bytes left where 1 byte is the dot
-    // case 1 -> X.X & case 2 -> XX.X
-    // We need to convert the digits to integer
-    // Simply, this is the same as: '12.3'.replaceAll('.','').reduce((a,b) => (a * 10 ) + b)
-    // which gives: 123 as an integer (we divide later)
-    // but without unncessary conversions.
+
+    // At this point, we are left with two possible cases: "X.X" or "XX.X"
+    //
+    // To convert the bytes (code units) to an integer or a double, we are effictively doing:
+    // ```dart
+    // double temp = '12.3'
+    //     .replaceAll('.', '')
+    //     .codeUnits
+    //     .map((unit) => unit - zeroCodeUnit)
+    //     .reduce((a, b) => (a * 10) + b)
+    //     .toDouble();
+    // temp = sign * temp / 10; // result: 12.3 as double
+    // ```
+    // ... but much more directly without unnecessary conversions.
     if (bytes[marker + 1] == dotCodeUnit) {
-      temp = ((bytes[marker] - zeroCodeUnit) * 10) + (bytes[marker + 2] - zeroCodeUnit);
-      marker = marker + 3; // i.e. newline mark
+      final d0 = bytes[marker] - zeroCodeUnit; // before dot
+      marker += 2;
+      final d1 = bytes[marker] - zeroCodeUnit; // after dot
+      temp = 10 * d0 + d1;
     } else {
       final d0 = bytes[marker]; // first digit
       marker += 1;
       final d1 = bytes[marker]; // digit before dot
       marker += 2;
       final d2 = bytes[marker]; // digit after dot
-      temp = (100 * d0) + (10 * d1) + d2 - (111 * zeroCodeUnit); // two steps combined in one
-      marker++;
+      // two steps factored into one
+      temp = (100 * d0) + (10 * d1) + d2 - (111 * zeroCodeUnit);
     }
+    // we divide later at the printing stage to avoid division and int.toDouble conversion
     temp *= sign;
 
-    final stats = stations[stationHash]; // 22% of total time is spent here
+    // Hottest spot when looking at the CPU profiler.
+    final stats = stations[stationHash];
 
     if (stats != null) {
       stats
@@ -161,7 +184,8 @@ Map<int, StationStats> computeChunk(int startByte, int endByte, int fileLength, 
       );
     }
 
-    fromIndex = marker + 1;
+    // skip the newline and increment to the begining of the next row
+    fromIndex = marker + 2;
   }
 
   return stations;
@@ -170,11 +194,7 @@ Map<int, StationStats> computeChunk(int startByte, int endByte, int fileLength, 
 /* -------------------------------------------------------------------------- */
 /*                                  CONSTANTS                                 */
 /* -------------------------------------------------------------------------- */
-
-const rows = 1 * 1000 * 1000 * 1000;
 const maxBytesPerRow = 107; // see README
-
-// code units
 const newLineCodeUnit = 10;
 const minusCodeUnit = 45;
 const dotCodeUnit = 46;
@@ -208,7 +228,10 @@ class StationStats {
     final merged = <int, StationStats>{};
     for (var station in stations) {
       for (var stat in station.entries) {
-        final mergedStat = merged.putIfAbsent(stat.key, () => StationStats(stat.value.name, stat.value.hash));
+        final mergedStat = merged.putIfAbsent(
+          stat.key,
+          () => StationStats(stat.value.name, stat.value.hash),
+        );
         mergedStat
           ..maximum = max(mergedStat.maximum, stat.value.maximum)
           ..minimum = min(mergedStat.minimum, stat.value.minimum)
